@@ -50,7 +50,7 @@ use fp_evm::{
 use crate::{
 	runner::Runner as RunnerT, AccountCodes, AccountCodesMetadata, AccountStorages, AddressMapping,
 	BalanceOf, BlockHashMapping, Config, Error, Event, FeeCalculator, OnChargeEVMTransaction,
-	OnCreate, Pallet, RunnerError,
+	OnCreate, Pallet, RunnerError, bnc_value_shrink
 };
 
 #[cfg(feature = "forbid-evm-reentrancy")]
@@ -231,7 +231,7 @@ where
 				})?;
 
 		// Deduct fee from the `source` account. Returns `None` if `total_fee` is Zero.
-		let fee = T::OnChargeTransaction::withdraw_fee(&source, total_fee)
+		let fee = T::OnChargeTransaction::withdraw_fee(&source, bnc_value_shrink(total_fee))
 			.map_err(|e| RunnerError { error: e, weight })?;
 
 		// Execute the EVM call.
@@ -258,8 +258,8 @@ where
 			)),
 			_ => used_gas.into(),
 		};
-		let actual_fee = effective_gas.saturating_mul(total_fee_per_gas);
-		let actual_base_fee = effective_gas.saturating_mul(base_fee);
+		let actual_fee = bnc_value_shrink(executor.fee(total_fee_per_gas));
+		let actual_base_fee = bnc_value_shrink(effective_gas.saturating_mul(base_fee));
 
 		log::debug!(
 			target: "evm",
@@ -904,11 +904,11 @@ where
 	fn transfer(&mut self, transfer: Transfer) -> Result<(), ExitError> {
 		let source = T::AddressMapping::into_account_id(transfer.source);
 		let target = T::AddressMapping::into_account_id(transfer.target);
+		let value = bnc_value_shrink(transfer.value);
 		T::Currency::transfer(
 			&source,
 			&target,
-			transfer
-				.value
+			value
 				.try_into()
 				.map_err(|_| ExitError::OutOfFund)?,
 			ExistenceRequirement::AllowDeath,

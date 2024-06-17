@@ -109,6 +109,19 @@ pub use self::{
 	weights::WeightInfo,
 };
 
+pub const BNC_VALUE_ADAPTOR: u128 = 1_000_000;
+
+pub fn bnc_value_expand(origin: U256) -> U256 {
+	origin
+		.saturating_mul(U256::from(BNC_VALUE_ADAPTOR))
+}
+
+pub fn bnc_value_shrink(origin: U256) -> U256 {
+	origin
+		.checked_div(U256::from(BNC_VALUE_ADAPTOR))
+		.unwrap_or(U256::from(BNC_VALUE_ADAPTOR))
+}
+
 #[frame_support::pallet]
 pub mod pallet {
 	use super::*;
@@ -899,7 +912,9 @@ impl<T: Config> Pallet<T> {
 		(
 			Account {
 				nonce: U256::from(UniqueSaturatedInto::<u128>::unique_saturated_into(nonce)),
-				balance: U256::from(UniqueSaturatedInto::<u128>::unique_saturated_into(balance)),
+				balance: bnc_value_expand(U256::from(
+					UniqueSaturatedInto::<u128>::unique_saturated_into(balance),
+				))
 			},
 			T::DbWeight::get().reads(2),
 		)
